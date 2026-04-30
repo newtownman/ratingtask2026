@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Voice Perception Study</title>
+  <title>Voice Rating Task</title>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -538,15 +538,15 @@ input[type="range"].custom-slider::-webkit-slider-thumb {
 ══════════════════════════════════════════ -->
 <div id="screen-login" class="screen active">
   <div class="card">
-    <div class="study-label">Voice Perception Study</div>
+    <div class="study-label">English Linguistics Study</div>
     <h1>How do we hear<br/><em>synthetic voices</em>?</h1>
     <p class="subtitle">
       You will listen to a series of short voice samples and answer a few questions about each one.
-      The study takes approximately 30–40 minutes.
+      The study takes approximately 20-30 minutes.
     </p>
     <hr class="divider"/>
     <label class="field-label" for="nickname-input">Participant ID</label>
-    <input type="text" id="nickname-input" placeholder="e.g., yein_01 or your assigned code"
+    <input type="text" id="nickname-input" placeholder="e.g., john_doe123"
            autocomplete="off" autocorrect="off" spellcheck="false"/>
     <p class="field-hint">Enter any ID you'll remember. If returning, use the same ID to resume.</p>
     <div class="error-msg" id="login-error">Please enter a participant ID.</div>
@@ -566,7 +566,7 @@ input[type="range"].custom-slider::-webkit-slider-thumb {
     <h2>Instructions</h2>
     <ul class="instr-list">
       <li><span class="instr-num">1</span>
-          You will hear <strong id="total-count">114</strong> short audio samples, one at a time.</li>
+          You will hear <strong id="total-count">122</strong> short audio samples, one at a time.</li>
       <li><span class="instr-num">2</span>
           After each sample, answer a few questions using the response scales provided.</li>
       <li><span class="instr-num">3</span>
@@ -592,7 +592,7 @@ input[type="range"].custom-slider::-webkit-slider-thumb {
 
     <!-- Audio player -->
     <div class="audio-wrap">
-      <div class="sample-counter" id="sample-counter">Sample 1 of 114</div>
+      <div class="sample-counter" id="sample-counter">Sample 1 of 122</div>
       <div class="audio-controls">
         <button id="play-btn" onclick="togglePlay()" title="Play / Pause">
           <svg id="play-icon" width="14" height="16" viewBox="0 0 14 16"><path d="M2 1l10 7L2 15z"/></svg>
@@ -616,11 +616,10 @@ input[type="range"].custom-slider::-webkit-slider-thumb {
     <!-- Footer -->
     <div class="task-footer">
       <div class="progress-label">
-        <strong id="footer-current">1</strong> / <span id="footer-total">114</span> completed
+        <strong id="footer-current">1</strong> / <span id="footer-total">122</span> completed
       </div>
       <button class="btn btn-primary" id="next-btn" onclick="submitResponse()" disabled>
-        <div class="spinner" id="next-spinner"></div>
-        <span class="btn-text" id="next-btn-text">Next →</span>
+        <span id="next-btn-text">Next →</span>
       </button>
     </div>
 
@@ -639,7 +638,7 @@ input[type="range"].custom-slider::-webkit-slider-thumb {
     </div>
     <h2>All done — thank you!</h2>
     <p style="margin-bottom:1rem;">
-      You've completed all <strong id="complete-count">114</strong> samples.
+      You've completed all <strong id="complete-count">122</strong> samples.
       Your responses have been recorded.
     </p>
     <p>You may now close this tab.</p>
@@ -792,46 +791,30 @@ const AUDIO_FILES = [
 ];
 
 // ─── Questions config ──────────────────────
-// type: 'likert' | 'dropdown' | 'slider'
-// Change text, options, anchors here — no other code changes needed.
+// type: 'likert' | 'map'
+// Change text / anchors here — no other code changes needed.
 const QUESTIONS = [
   {
     id: 'q1',
-    type: 'likert',
-    text: '[QUESTION 1 TEXT] — e.g., "This voice sounds natural to me."',
-    scale: 5,
-    anchorLow:  'Strongly disagree',
-    anchorHigh: 'Strongly agree'
+    type: 'map',
+    text: 'Where does this voice seem to come from? Click the map to place a pin.',
+    required: true   // false → pin 없어도 Next 활성화
   },
   {
     id: 'q2',
-    type: 'dropdown',
-    text: '[QUESTION 2 TEXT] — e.g., "Which region does this voice remind you of most?"',
-    placeholder: '— Select one —',
-    options: [
-      'Southern United States',
-      'Midwestern United States',
-      'Northeastern United States',
-      'Western United States',
-      'No particular region',
-      'Not sure'
-    ]
+    type: 'likert',
+    scale: 5,
+    text: 'Does this voice sound natural?',
+    anchorLow:  'Not natural at all',
+    anchorHigh: 'Completely natural'
   },
   {
     id: 'q3',
-    type: 'slider',
-    text: '[QUESTION 3 TEXT] — e.g., "How strong is the regional accent in this voice?"',
-    min: 0,
-    max: 100,
-    defaultValue: 50,
-    anchorLow:  'No accent at all',
-    anchorHigh: 'Very strong accent'
-  },
-  {
-    id: 'q4',
-    type: 'map',
-    text: '[QUESTION 4 TEXT] — e.g., "Where do you think this speaker is from? Click the map to place a pin."',
-    required: true   // false → skip validation (always counts as answered)
+    type: 'likert',
+    scale: 5,
+    text: 'Does this voice sound like someone from your hometown?',
+    anchorLow:  'Not at all',
+    anchorHigh: 'Very much so'
   }
 ];
 
@@ -895,16 +878,33 @@ async function handleLogin() {
       .single();
 
     if (existing) {
-      // Returning participant — resume
-      state.nickname      = existing.nickname;
-      state.participantId = existing.id;
-      state.sampleOrder   = existing.sample_order;
-      state.currentIndex  = existing.last_sample_index;
-
       if (existing.completed) {
-        document.getElementById('complete-count').textContent = AUDIO_FILES.length;
-        showScreen('complete');
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = 'This ID has already completed the study. Please use a different Participant ID.';
+        errEl.style.display = 'block';
         return;
+      } else {
+        const resume = confirm(
+          'It looks like there is an unfinished session under this ID.
+
+' +
+          'Would you like to continue where you left off?
+
+' +
+          '• OK — Resume the previous session
+' +
+          '• Cancel — Go back and enter a different ID'
+        );
+        if (!resume) {
+          const errEl = document.getElementById('login-error');
+          errEl.textContent = 'Please enter a different Participant ID.';
+          errEl.style.display = 'block';
+          return;
+        }
+        state.nickname      = existing.nickname;
+        state.participantId = existing.id;
+        state.sampleOrder   = existing.sample_order;
+        state.currentIndex  = existing.last_sample_index;
       }
     } else {
       // New participant — create record
@@ -931,7 +931,7 @@ async function handleLogin() {
     document.getElementById('login-error').textContent = 'Connection error. Check Supabase config.';
     document.getElementById('login-error').style.display = 'block';
   } finally {
-    btn.classList.remove('loading'); btn.disabled = false;
+    btn.disabled = false;
   }
 }
 
@@ -1002,8 +1002,8 @@ function renderQuestions() {
                </div>
                <div class="map-footer">
                  <span class="map-state-name" id="${q.id}_statename">—</span>
-                 <span class="map-hint" id="${q.id}_hint">클릭해서 핀을 놓으세요</span>
-                 <button class="map-reset" id="${q.id}_reset" onclick="resetMap('${q.id}')">핀 제거</button>
+                 <span class="map-hint" id="${q.id}_hint">Click on a US state to place a pin</span>
+                 <button class="map-reset" id="${q.id}_reset" onclick="resetMap('${q.id}')">Remove pin</button>
                </div>`;
     }
 
@@ -1264,6 +1264,17 @@ function drawMap(qid, topo) {
 }
 
 function placeMapPin(qid, svgX, svgY, stateName, W, H) {
+  // Block ocean/outside clicks
+  if (!stateName) {
+    const hintEl = document.getElementById(qid + '_hint');
+    hintEl.textContent = '⚠ Please click on a US state.';
+    hintEl.style.color = 'var(--warn)';
+    setTimeout(() => {
+      hintEl.style.color = '';
+      hintEl.textContent = mapPins[qid] && mapPins[qid].placed ? 'Drag to adjust' : 'Click on a US state to place a pin';
+    }, 2000);
+    return;
+  }
   const svgEl = document.getElementById(qid + '_svg');
   const svg   = d3.select(svgEl);
 
@@ -1310,8 +1321,8 @@ function placeMapPin(qid, svgX, svgY, stateName, W, H) {
   const nameEl  = document.getElementById(qid + '_statename');
   const hintEl  = document.getElementById(qid + '_hint');
   const resetEl = document.getElementById(qid + '_reset');
-  nameEl.textContent  = stateName || '(지도 밖)';
-  hintEl.textContent  = '드래그해서 조정 가능';
+  nameEl.textContent  = stateName || '(outside map)';
+  hintEl.textContent  = 'Drag to adjust';
   resetEl.style.display = 'inline';
 
   onResponseChange();
@@ -1366,7 +1377,7 @@ function setupPinDrag(qid, svgEl, W, H, stateName, path, states) {
       if (sn) d3.select(svgEl).selectAll('.state-path')
         .filter(function() { return d3.select(this).attr('data-name') === sn; })
         .classed('active', true);
-      document.getElementById(qid + '_statename').textContent = sn || '(지도 밖)';
+      document.getElementById(qid + '_statename').textContent = sn || '(outside map)';
       mapPins[qid] = { placed: true, state: sn || '(ocean)', x_pct: Math.round(x/W*1000)/10, y_pct: Math.round(y/H*1000)/10 };
     };
     const onUp = () => { dragging = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
@@ -1388,7 +1399,7 @@ function setupPinDrag(qid, svgEl, W, H, stateName, path, states) {
       if (sn) d3.select(svgEl).selectAll('.state-path')
         .filter(function() { return d3.select(this).attr('data-name') === sn; })
         .classed('active', true);
-      document.getElementById(qid + '_statename').textContent = sn || '(지도 밖)';
+      document.getElementById(qid + '_statename').textContent = sn || '(outside map)';
       mapPins[qid] = { placed: true, state: sn || '(ocean)', x_pct: Math.round(x/W*1000)/10, y_pct: Math.round(y/H*1000)/10 };
     };
     const onEnd = () => { svgEl.removeEventListener('touchmove', onMove); svgEl.removeEventListener('touchend', onEnd); };
@@ -1416,13 +1427,14 @@ function resetMap(qid) {
   d3.select(svgEl).selectAll('.state-path').classed('active', false);
   mapPins[qid] = { placed: false, state: null, x_pct: null, y_pct: null };
   document.getElementById(qid + '_statename').textContent = '—';
-  document.getElementById(qid + '_hint').textContent      = '클릭해서 핀을 놓으세요';
+  document.getElementById(qid + '_hint').textContent      = 'Click on a US state to place a pin';
   document.getElementById(qid + '_reset').style.display   = 'none';
   onResponseChange();
 }
 
+async function submitResponse() {
   const btn = document.getElementById('next-btn');
-  btn.classList.add('loading'); btn.disabled = true;
+  btn.disabled = true;
 
   const responses  = collectResponses();
   const filename   = state.sampleOrder[state.currentIndex];
@@ -1458,7 +1470,7 @@ function resetMap(qid) {
   } catch (err) {
     console.error(err);
     alert('Error saving response. Please check your connection and try again.');
-    btn.classList.remove('loading'); btn.disabled = false;
+    btn.disabled = false;
   }
 }
 </script>
