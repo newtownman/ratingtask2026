@@ -660,7 +660,7 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // Base URL where your audio files are hosted.
 // Example for GitHub raw:
 // 'https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/audio/'
-const AUDIO_BASE_URL = 'https://raw.githubusercontent.com/newtownman/ratingtask2026/main/audio/';
+const AUDIO_BASE_URL = 'https://newtownman.github.io/ratingtask2026/audio/';
 
 // ─── Audio file list ───────────────────────
 // Fill this array with your actual filenames.
@@ -1061,7 +1061,7 @@ const progress  = document.getElementById('audio-progress');
 
 function loadSample(index) {
   const filename = state.sampleOrder[index];
-  audioEl.src = AUDIO_BASE_URL + filename;
+  audioEl.src = AUDIO_BASE_URL + encodeURIComponent(filename);
   audioEl.load();
   progress.value = 0;
   document.getElementById('time-current').textContent = '0:00';
