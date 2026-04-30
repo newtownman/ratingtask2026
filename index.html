@@ -884,12 +884,7 @@ async function handleLogin() {
         errEl.style.display = 'block';
         return;
       } else {
-        const resume = confirm('It looks like there is an unfinished session under this ID.
-
-Would you like to continue where you left off?
-
-• OK — Resume the previous session
-• Cancel — Go back and enter a different ID');
+        const resume = confirm(`It looks like there is an unfinished session under this ID.\n\nWould you like to continue where you left off?\n\n• OK — Resume the previous session\n• Cancel — Go back and enter a different ID`);
         if (!resume) {
           const errEl = document.getElementById('login-error');
           errEl.textContent = 'Please enter a different Participant ID.';
