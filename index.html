@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Rating Task</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+
+<style>
+:root {
+  --bg:        #f4f1ec;
+  --surface:   #ffffff;
+  --border:    #e2ddd6;
+  --text:      #1e1c18;
+  --muted:     #7a756c;
+  --accent:    #2d5f4e;
+  --accent-lt: #e8f0ec;
+  --warn:      #c0392b;
+  --radius:    12px;
+  --shadow:    0 2px 16px rgba(0,0,0,0.07);
+  --font-head: 'Fraunces', Georgia, serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+#progress-bar-wrap {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 4px; background: var(--border); z-index: 100; display: none;
+}
+#progress-bar-fill {
+  height: 100%; background: var(--accent);
+  transition: width 0.4s ease; border-radius: 0 2px 2px 0;
+}
+.card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); border: 1px solid var(--border);
+  padding: 2.5rem 2.8rem; width: 100%; max-width: 640px;
+}
+.card.has-map { max-width: 820px; }
+.study-label {
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 0.8rem;
+}
+h1 { font-family: var(--font-head); font-size: 2rem; font-weight: 600; line-height: 1.25; margin-bottom: 0.5rem; }
+h2 { font-family: var(--font-head); font-size: 1.35rem; font-weight: 600; margin-bottom: 1rem; }
+.subtitle { color: var(--muted); font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.8rem; }
+p { line-height: 1.65; color: var(--muted); font-size: 0.93rem; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+label.field-label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.45rem; color: var(--text); }
+input[type="text"], input[type="email"], select.info-select {
+  width: 100%; padding: 0.75rem 1rem;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-family: var(--font-body); font-size: 1rem; color: var(--text);
+  background: var(--bg); outline: none; transition: border-color 0.2s;
+  appearance: none;
+}
+input[type="text"]:focus, input[type="email"]:focus, select.info-select:focus {
+  border-color: var(--accent); background: #fff;
+}
+.field-hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; }
+.field-group { margin-bottom: 1.2rem; }
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.75rem 1.6rem; border-radius: 8px;
+  font-family: var(--font-body); font-size: 0.95rem; font-weight: 600;
+  cursor: pointer; border: none; transition: all 0.15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #245041; transform: translateY(-1px); }
+.btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+.btn-outline { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+.btn-outline:hover { background: var(--accent-lt); }
+.btn-block { width: 100%; justify-content: center; margin-top: 1.2rem; }
+.btn-row { display: flex; gap: 0.8rem; margin-top: 1.2rem; }
+.btn-row .btn { flex: 1; justify-content: center; }
+.error-msg { color: var(--warn); font-size: 0.83rem; margin-top: 0.5rem; display: none; }
+.audio-wrap {
+  background: var(--accent-lt); border-radius: 10px;
+  padding: 1.2rem 1.5rem; margin-bottom: 1.8rem;
+  display: flex; flex-direction: column; gap: 0.8rem;
+}
+.sample-counter { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.audio-controls { display: flex; align-items: center; gap: 1rem; }
+#play-btn {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--accent);
+  border: none; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0; transition: background 0.15s;
+}
+#play-btn:hover { background: #245041; }
+#play-btn svg { fill: #fff; }
+.audio-timeline { flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+#audio-progress {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+  border-radius: 2px; background: #c5d9d2; outline: none; cursor: pointer;
+}
+#audio-progress::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--accent); cursor: pointer;
+}
+.audio-time { font-size: 0.75rem; color: var(--muted); display: flex; justify-content: space-between; }
+.replay-hint { font-size: 0.78rem; color: var(--muted); text-align: center; }
+.question-block { margin-bottom: 1.8rem; }
+.question-text { font-size: 0.95rem; font-weight: 500; color: var(--text); margin-bottom: 0.9rem; line-height: 1.5; }
+.question-index { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+.likert-row { display: flex; gap: 0.5rem; }
+.likert-option { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+.likert-option input[type="radio"] { display: none; }
+.likert-option label {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 0.55rem 0; border-radius: 8px;
+  border: 1.5px solid var(--border); font-weight: 600; font-size: 0.95rem;
+  cursor: pointer; transition: all 0.15s; color: var(--muted);
+}
+.likert-option input:checked + label { background: var(--accent); border-color: var(--accent); color: #fff; }
+.likert-option label:hover { border-color: var(--accent); color: var(--accent); }
+.likert-option input:checked + label:hover { color: #fff; }
+.likert-anchors { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
+
+/* MAP */
+.map-outer {
+  border: 1.5px solid var(--border); border-radius: 10px;
+  overflow: hidden; position: relative; background: #dbeaf3;
+  cursor: crosshair; width: 100%;
+}
+.map-outer svg { display: block; width: 100%; height: auto; }
+.state-path { fill: #c8dce8; stroke: #fff; stroke-width: 0.8; transition: fill 0.12s; }
+.state-path:hover { fill: #9bbdd4; }
+.state-path.active { fill: #2d5f4e; }
+.region-overlay { opacity: 0.35; pointer-events: none; }
+.region-label { font-size: 17px; font-weight: 700; fill: #333; pointer-events: none; font-family: Georgia, serif; letter-spacing: 0.03em; }
+.state-border { fill: none; stroke: #fff; stroke-width: 1.2; pointer-events: none; }
+.nation-border { fill: none; stroke: #8fb8cc; stroke-width: 1; pointer-events: none; }
+.map-pin { pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); }
+.map-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 0.55rem; min-height: 22px; }
+.map-state-name { font-size: 0.82rem; font-weight: 600; color: var(--accent); }
+.map-hint { font-size: 0.75rem; color: var(--muted); }
+.map-reset { font-size: 0.75rem; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; display: none; }
+.map-reset:hover { color: var(--warn); }
+
+/* TASK FOOTER */
+.task-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border); }
+.progress-label { font-size: 0.82rem; color: var(--muted); }
+.progress-label strong { color: var(--text); }
+
+/* INSTRUCTIONS */
+.instr-list { list-style: none; display: flex; flex-direction: column; gap: 0.9rem; margin: 1.2rem 0 1.8rem; }
+.instr-list li { display: flex; gap: 0.8rem; align-items: flex-start; font-size: 0.93rem; color: var(--text); }
+.instr-num {
+  background: var(--accent); color: #fff; width: 22px; height: 22px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+}
+.pay-note { background: #fffbea; border: 1px solid #f0e080; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.85rem; color: #7a6800; margin-top: 1rem; }
+
+/* COMPLETE / INFO */
+.complete-icon { width: 60px; height: 60px; background: var(--accent-lt); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+.complete-icon svg { stroke: var(--accent); }
+.center { text-align: center; }
+
+/* SPINNER */
+.spinner { width: 20px; height: 20px; border: 2.5px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading .spinner { display: block; }
+.loading .btn-text { display: none; }
+
+.screen { display: none; animation: fadeIn 0.3s ease; }
+.screen.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div id="progress-bar-wrap"><div id="progress-bar-fill" style="width:0%"></div></div>
+
+<!-- SCREEN 1 · LOGIN -->
+<div id="screen-login" class="screen active">
+  <div class="card">
+    <div class="study-label">English Linguistics Study</div>
+    <h1>How do we hear<br/><em>synthetic voices</em>?</h1>
+    <p class="subtitle">You will listen to a series of short voice samples and answer a few questions about each one. The study takes approximately 20–30 minutes.</p>
+    <hr class="divider"/>
+    <label class="field-label" for="nickname-input">Participant ID</label>
+    <input type="text" id="nickname-input" placeholder="e.g., john_doe123" autocomplete="off" autocorrect="off" spellcheck="false"/>
+    <p class="field-hint">Enter any ID you'll remember. If returning, use the same ID to resume.</p>
+    <div class="error-msg" id="login-error">Please enter a participant ID.</div>
+    <button class="btn btn-primary btn-block" id="start-btn" onclick="handleLogin()">
+      <div class="spinner" id="login-spinner"></div>
+      <span class="btn-text">Begin Study →</span>
+    </button>
+  </div>
+</div>
+
+<!-- SCREEN 2 · INSTRUCTIONS -->
+<div id="screen-instructions" class="screen">
+  <div class="card">
+    <div class="study-label">Before you begin</div>
+    <h2>Instructions</h2>
+    <ul class="instr-list">
+      <li><span class="instr-num">1</span>You will hear <strong id="total-count">122</strong> short audio samples, one at a time.</li>
+      <li><span class="instr-num">2</span>After each sample, answer a few questions using the response scales provided.</li>
+      <li><span class="instr-num">3</span>You can replay each sample as many times as you like before moving on.</li>
+      <li><span class="instr-num">4</span>If you need to take a break, close the tab — your progress is saved automatically. Return with the same Participant ID to resume.</li>
+      <li><span class="instr-num">5</span>There are no right or wrong answers. Trust your first impression and answer freely.</li>
+      <li><span class="instr-num">6</span>At the end of the study, you will be asked to fill in your personal information. <strong>Payment will only be processed after this step is completed.</strong></li>
+    </ul>
+    <p style="font-size:0.85rem;color:var(--muted);background:var(--bg);padding:0.9rem 1rem;border-radius:8px;">🎧 Please use headphones or earphones if possible, and find a quiet environment.</p>
+    <button class="btn btn-primary btn-block" onclick="startTask()">Start →</button>
+  </div>
+</div>
+
+<!-- SCREEN 3 · RATING TASK -->
+<div id="screen-task" class="screen">
+  <div class="card">
+    <div class="audio-wrap">
+      <div class="sample-counter" id="sample-counter">Sample 1 of 122</div>
+      <div class="audio-controls">
+        <button id="play-btn" onclick="togglePlay()" title="Play / Pause">
+          <svg id="play-icon" width="14" height="16" viewBox="0 0 14 16"><path d="M2 1l10 7L2 15z"/></svg>
+          <svg id="pause-icon" width="14" height="16" viewBox="0 0 14 16" style="display:none"><rect x="2" y="1" width="4" height="14" rx="1"/><rect x="8" y="1" width="4" height="14" rx="1"/></svg>
+        </button>
+        <div class="audio-timeline">
+          <input type="range" id="audio-progress" value="0" min="0" step="0.01"/>
+          <div class="audio-time"><span id="time-current">0:00</span><span id="time-total">0:00</span></div>
+        </div>
+      </div>
+      <div class="replay-hint">You may replay this sample as many times as needed.</div>
+    </div>
+    <audio id="audio-el" preload="auto"></audio>
+    <div id="questions-container"></div>
+    <div class="task-footer">
+      <div class="progress-label"><strong id="footer-current">1</strong> / <span id="footer-total">122</span> completed</div>
+      <button class="btn btn-primary" id="next-btn" onclick="submitResponse()" disabled>
+        <span id="next-btn-text">Next →</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 4 · PARTICIPANT INFO -->
+<div id="screen-info" class="screen">
+  <div class="card">
+    <div class="study-label">Almost done</div>
+    <h2>Your Information</h2>
+    <p style="margin-bottom:1.5rem;">Please fill in the following information. This is required for payment processing.</p>
+
+    <div class="field-group">
+      <label class="field-label">Full Name</label>
+      <input type="text" id="info-name" placeholder="Your full name" />
+    </div>
+    <div class="field-group">
+      <label class="field-label">Email Address</label>
+      <input type="email" id="info-email" placeholder="your@email.com" />
+    </div>
+    <div class="field-group">
+      <label class="field-label">Age</label>
+      <input type="text" id="info-age" placeholder="e.g., 24" />
+    </div>
+    <div class="field-group">
+      <label class="field-label">Native Language</label>
+      <input type="text" id="info-language" placeholder="e.g., Korean" />
+    </div>
+    <div class="field-group">
+      <label class="field-label">Country of Origin</label>
+      <input type="text" id="info-country" placeholder="e.g., South Korea" />
+    </div>
+    <div class="field-group">
+      <label class="field-label">English Proficiency</label>
+      <select class="info-select" id="info-english">
+        <option value="" disabled selected>— Select one —</option>
+        <option>Native speaker</option>
+        <option>Near-native / Advanced</option>
+        <option>Intermediate</option>
+        <option>Beginner</option>
+      </select>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Additional Comments (optional)</label>
+      <input type="text" id="info-comments" placeholder="Any comments about the study" />
+    </div>
+
+    <div class="error-msg" id="info-error">Please fill in all required fields.</div>
+    <button class="btn btn-primary btn-block" onclick="submitInfo()">Submit →</button>
+  </div>
+</div>
+
+<!-- SCREEN 5 · PRODUCTION TASK OPT-IN -->
+<div id="screen-production" class="screen">
+  <div class="card center">
+    <div class="complete-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>Thank you!</h2>
+    <p style="margin-bottom:1.2rem;">Your responses have been recorded and your information has been submitted.</p>
+    <p style="margin-bottom:1.8rem;">There is one more optional task available — a short <strong>speech production study</strong>. Would you like to participate?</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="goToProduction()">Yes, I'll participate →</button>
+      <button class="btn btn-outline" onclick="showScreen('complete')">No, I'm done</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 6 · COMPLETE -->
+<div id="screen-complete" class="screen">
+  <div class="card center">
+    <div class="complete-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>All done — thank you!</h2>
+    <p style="margin-bottom:1rem;">You've completed all <strong id="complete-count">122</strong> samples. Your responses have been recorded.</p>
+    <p>You may now close this tab.</p>
+  </div>
+</div>
+
+<script>
+/* ── CONFIG ── */
+const SUPABASE_URL  = 'https://snwwuzrdpslhbisdubmf.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3d1enJkcHNsaGJpc2R1Ym1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NjAzMTgsImV4cCI6MjA5MzAzNjMxOH0.rWfdYWZ1F7OHp8peyPR9LJXqJIiWHLE6eRZKXgnWQ8Y';
+const AUDIO_BASE_URL = 'https://raw.githubusercontent.com/newtownman/ratingtask2026/main/audio/';
+
+const AUDIO_FILES = [
+  "boston__001__Adam_-_Confident,_Clear_and_Direct.mp3",
+  "boston__002__Chris_-_Cheerful,_Bright,_and_Friendly.mp3",
+  "boston__003__Jerry_B_-_Cheeky,_Mouthy_and_Bold.mp3",
+  "boston__004__Chris_-_Tough,_Sarcastic_and_Brash.mp3",
+  "boston__005__Jonathan_Bowen_-_Thoughtful_and_Concise.mp3",
+  "boston__006__Rory_-_Masculine_Educated.mp3",
+  "boston__007__Breno_Melo_-_Temperate_and_Smooth.mp3",
+  "chicago__001__Michael_-_Calm_and_Knowledgable.mp3",
+  "chicago__002__Darius_Wells_-_Cheerful,_and_Rich.mp3",
+  "chicago__003__Derrick_-_Friendly_&_support_character.mp3",
+  "new_york__001__Mike_-_Deep,_Calm_and_Captivating.mp3",
+  "new_york__002__Jerry_B_-_Brash,_Mischievous_and_Strong.mp3",
+  "new_york__003__Nina_-_Warm,_Polished,_and_Calm.mp3",
+  "new_york__004__Fernanda_-_Calm_Storytelling.mp3",
+  "new_york__005__Yelsin_-_Enthusiastic,_Driven_and_Suave.mp3",
+  "new_york__006__Peter_-_Neutral,_Calm,_and_Clipped.mp3",
+  "new_york__007__Jessica.mp3",
+  "new_york__008__Gene_-_Wise,_Professional_and_Direct.mp3",
+  "new_york__009__Carolina_-_Clear_and_Straightforward.mp3",
+  "new_york__010__Scott_-_Deep,_Smooth_and_Clear.mp3",
+  "new_york__011__Kebin_-_a_smooth,_deep_voice.mp3",
+  "new_york__012__Pauly_-_Brooklyn_Wise_Guy.mp3",
+  "new_york__013__Matt_Crawford_-_Robotic_and_Nerdy.mp3",
+  "new_york__014__Tom\u00e1s_-_Gentle_Multilingual_Student.mp3",
+  "new_york__015__Michael_Prime_-_Passionate_and_Assuring.mp3",
+  "new_york__016__Serenity_-_Expressive,_Quirky_and_Nerdy.mp3",
+  "new_york__017__NYC_Calm_Alto_-_Warm,_Confident_Black_Fe.mp3",
+  "new_york__018__Tomlinson_Barnaby.mp3",
+  "new_york__019__Gohar_-_Suspenseful,_Warm_Narrator.mp3",
+  "us_midwest__001__Kade_Murdock_-_Friendly_and_Polished.mp3",
+  "us_midwest__002__Mike_Adams_-_Raspy_and_Deep.mp3",
+  "us_midwest__003__Brian_-_Relaxed,_Natural_and_Confident.mp3",
+  "us_midwest__004__Michael_-_Deep_and_Smooth_Narrator.mp3",
+  "us_midwest__005__Peter_-_Engaging_and_Informative.mp3",
+  "us_midwest__006__Scott_-_Low,_Soft,_and_Calm.mp3",
+  "us_midwest__007__Gentle_Mara_-_Warm,_Caring,_and_Smooth.mp3",
+  "us_midwest__008__Samuel_Garcia_-_Bright,_Calm_and_Natural.mp3",
+  "us_midwest__009__Ben_\u2013_Confident,_Clear_and_Engaging.mp3",
+  "us_midwest__010__Clifford_-_Western_Cowboy_Narrator.mp3",
+  "us_midwest__011__ASMR_Mike_-_Soft,_Meditative_Narrator.mp3",
+  "us_midwest__012__William_-_Professional_Lispy_Narrator.mp3",
+  "us_midwest__013__Brandon_-_Sophisticated_Content_Creator.mp3",
+  "us_midwest__014__Lauren_-_Clear,_Round,_and_Balanced.mp3",
+  "us_midwest__015__Rob_Lubow_-_Calm_and_Natural.mp3",
+  "us_midwest__016__Anya_\u2014_Grounded,_Warm,_Clear.mp3",
+  "us_midwest__017__Veronica_-_Soft-Spoken_and_Calm_Narrator.mp3",
+  "us_midwest__018__SuperDale_-_a_mid-age_voice_&_Friendly.mp3",
+  "us_midwest__019__Richard_-_Deep_and_Resonating.mp3",
+  "us_northeast__001__Josh_-_Distant,_Cold,_and_Clear.mp3",
+  "us_northeast__002__Emily_-_Soft,_Supportive_and_Reassuring.mp3",
+  "us_northeast__003__Aidan_-_Serious,_Balanced,_and_Full.mp3",
+  "us_northeast__004__Kelsey_-_Young,_Warm,_and_Casual.mp3",
+  "us_northeast__005__Mike_-_Clear_and_Fast_Paced.mp3",
+  "us_northeast__006__Sam_-_Comedic,_Raspy_and_Approachable.mp3",
+  "us_northeast__007__Fanz_-_Lively,_Fast_and_Spontaneous.mp3",
+  "us_northeast__008__Asher_-_Warm,_Tender_and_Round.mp3",
+  "us_northeast__009__Michael_-_Confident,_Clear_and_Energetic.mp3",
+  "us_northeast__010__Aurora_-_Calm_and_Steady_Narrator.mp3",
+  "us_northeast__011__Jose__-_Warm.mp3",
+  "us_northeast__012__Jamahal_-_Young,_Vibrant,_and_Natural.mp3",
+  "us_southern__001__Ms._Walker_\u2013_Warm,_Reassuring,_and_Round.mp3",
+  "us_southern__002__Austin_-_Deep,_Raspy_and_Authentic.mp3",
+  "us_southern__003__Jedediah_-_Inviting_and_Rich.mp3",
+  "us_southern__004__Bubba_Marshal_-_Southern_and_Raspy.mp3",
+  "us_southern__005__Eryn_-_Rich,_Warm_and_Conversational.mp3",
+  "us_southern__006__Shannon_-_Warm,_Inviting,_and_Round.mp3",
+  "us_southern__007__Rosie_-__Friendly,_and_Natural.mp3",
+  "us_southern__008__Alex_-_Articulate_and_Sharp_Storyteller.mp3",
+  "us_southern__009__Eric_-_Southern,_Confident_and_Sassy.mp3",
+  "us_southern__010__Grandma_Rachel_-_Wise_Southern_Senior.mp3",
+  "us_southern__011__Dr._Kendall.mp3",
+  "us_southern__012__Daisy_-_Playful_Southern_Narrator.mp3",
+  "us_southern__013__Maribeth_-_A_Southern_Sweetheart.mp3",
+  "us_southern__014__Antonio_-_The_Sneakerhead_Chef.mp3",
+  "us_southern__015__Hayden_-_Southern,_Bold_and_Clear.mp3",
+  "us_southern__016__Arthur_-_Engaging_Southern_Cowboy.mp3",
+  "us_southern__017__John_Texas_-_Deep_and_Smooth_Narrator.mp3",
+  "us_southern__018__Mason_-_Friendly_Southern_Neighbor.mp3",
+  "us_southern__019__Havoc_-_Gritty_Southern_Narrator.mp3",
+  "us_southern__020__Brother_Wayne_-_Warm_Southern_Preacher.mp3",
+  "us_southern__021__George_-_Natural,_Full_and_Confident.mp3",
+  "us_southern__022__Cowboy_Chris_-_Deep_and_Supportive.mp3",
+  "us_southern__023__Rhett_Sutton_-_Southern,_Slow_and_Deep.mp3",
+  "us_southern__024__Miss_Sally_May_-_Optimistic_and_Warm.mp3",
+  "us_southern__025__Yee_-_Nasal,_Witty_and_Sharp.mp3",
+  "us_southern__026__Kai_-_Podcast_&_Warm.mp3",
+  "us_southern__027__Harry_-_Southern_Senior_Narrator.mp3",
+  "us_southern__028__Alesha_-_Laidback,_Relaxed_and_Friendly.mp3",
+  "us_southern__029__Riley_-_Soft-Spoken_and_Curious.mp3",
+  "us_southern__030__Cletus_-_Hillbilly.mp3",
+  "us_southern__031__Glen_-_Romantic,_Warm,_and_Measured.mp3",
+  "us_southern__032__James_\u2013_Smooth,_Steady,_and_Southern.mp3",
+  "us_southern__033__Aunt_Shirley_-__Cheerful,_and_Full.mp3",
+  "us_southern__034__Christopher_-_Slow-Paced_Southern_Cowboy.mp3",
+  "us_southern__035__Cayla_-_Warm,_Melancholic,_and_Clear.mp3",
+  "us_southern__036__Josie_-_Southern,_Smooth_and_Sultry.mp3",
+  "us_southern__037__Hi_Sir_Ra_-_Seductive_and_Smooth.mp3",
+  "us_southern__038__Tiffany_-_Warm,_Smooth_and_Confident.mp3",
+  "us_southern__039__Joseph_-_Deep_Southern_Narrator.mp3",
+  "us_southern__040__Hank_Turner_-_Southern_&_Confident.mp3",
+  "us_southern__041__Honey_-_Hoarse_and_Natural_Narrator.mp3",
+  "us_southern__042__Telisa_-_Simply_Southern.mp3",
+  "us_southern__043__Miranda_-_Motherly,_Tender_and_Warm.mp3",
+  "us_southern__044__Grace_-_Honey-Smooth_Southern_Drawl.mp3",
+  "us_southern__045__Dusty_Garner_-_Sarcastic_Southern_Mom.mp3",
+  "us_southern__046__Middle_Aged_Southern_Man.mp3",
+  "us_southern__047__Mr._Pete_-_Warm_&_Laid_back_Southern_Dad.mp3",
+  "us_southern__048__Danielle_-_Warm_Southern_Storyteller.mp3",
+  "us_southern__049__Amara_-_Sweet_and_Soulful.mp3",
+  "us_southern__050__Military_Teacher.mp3",
+  "us_southern__051__Allison_-_Cowgirl_with_a_Southern_Accent.mp3",
+  "us_southern__052__Ms_Lisa_-_AI_receptionist.mp3",
+  "us_southern__053__Willow_Raye_-_Warm_&_Friendly.mp3",
+  "us_southern__054__Mischievous_Duck_-_it's_pretty_unique.mp3",
+  "us_southern__055__WrightTone.mp3",
+  "us_southern__056__Chonvill_-_Friendly_Southern_Narrator.mp3",
+  "us_southern__057__TTF_Jay.mp3",
+  "us_southern__058__Stephanie_-_Sweet_and_Sassy.mp3",
+  "us_southern__059__Nolan.mp3",
+  "us_southern__060__Gentle_and_steady_Southern_accent.mp3",
+  "us_southern__061__Krob_-_Deep_and_Smooth.mp3",
+  "us_southern__062__Jethran_Frye.mp3",
+];
+
+/* ── QUESTIONS ── */
+const QUESTIONS = [
+  {
+    id: 'q1',
+    type: 'map',
+    text: 'Where does this voice seem to come from? Click the map to place a pin.',
+    required: true
+  },
+  {
+    id: 'q2',
+    type: 'likert',
+    scale: 5,
+    text: 'How confident are you in your answer to Question 1?',
+    anchorLow:  'Not confident at all',
+    anchorHigh: 'Very confident'
+  },
+  {
+    id: 'q3',
+    type: 'likert',
+    scale: 5,
+    text: 'Does this voice sound natural?',
+    anchorLow:  'Not natural at all',
+    anchorHigh: 'Completely natural'
+  },
+  {
+    id: 'q4',
+    type: 'likert',
+    scale: 5,
+    text: 'Does this voice sound friendly?',
+    anchorLow:  'Sounds like a stranger',
+    anchorHigh: 'Sounds very friendly'
+  },
+  {
+    id: 'q5',
+    type: 'likert',
+    scale: 5,
+    text: 'Does this voice sound like an educated person?',
+    anchorLow:  'Sounds like an uneducated person',
+    anchorHigh: 'Sounds like a very educated person'
+  }
+];
+
+/* ── REGION DEFINITIONS (Labov & Ash 2006) ── */
+const REGIONS = {
+  'West': {
+    states: ['Washington','Oregon','California','Nevada','Idaho','Montana','Wyoming','Utah','Colorado','Arizona','New Mexico'],
+    color: '#b8d0c0', labelX: 195, labelY: 320
+  },
+  'Midwest': {
+    states: ['North Dakota','South Dakota','Nebraska','Kansas','Minnesota','Iowa','Missouri','Wisconsin','Illinois','Indiana','Michigan','Ohio'],
+    color: '#e8c87a', labelX: 535, labelY: 215
+  },
+  'South': {
+    states: ['Texas','Oklahoma','Arkansas','Louisiana','Mississippi','Alabama','Tennessee','Kentucky','West Virginia','North Carolina','South Carolina','Georgia','Florida'],
+    color: '#f0b8b8', labelX: 590, labelY: 410
+  },
+  'Mid-Atlantic': {
+    states: ['New York','New Jersey','Pennsylvania','Delaware','Maryland','Virginia'],
+    color: '#c0c0c8', labelX: 790, labelY: 200
+  },
+  'N.E.': {
+    states: ['Maine','New Hampshire','Vermont','Massachusetts','Rhode Island','Connecticut'],
+    color: '#c0a8d8', labelX: 848, labelY: 108
+  }
+};
+
+/* ── SUPABASE ── */
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+/* ── STATE ── */
+let state = {
+  nickname: '', participantId: null,
+  sampleOrder: [], currentIndex: 0
+};
+
+/* ── SCREENS ── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ── LOGIN ── */
+async function handleLogin() {
+  const nickname = document.getElementById('nickname-input').value.trim();
+  if (!nickname) {
+    document.getElementById('login-error').style.display = 'block';
+    return;
+  }
+  document.getElementById('login-error').style.display = 'none';
+  const btn = document.getElementById('start-btn');
+  btn.classList.add('loading'); btn.disabled = true;
+
+  try {
+    const { data: existing } = await db.from('participants').select('*').eq('nickname', nickname).single();
+
+    if (existing) {
+      if (existing.completed) {
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = 'This ID has already completed the study. Please use a different Participant ID.';
+        errEl.style.display = 'block';
+        return;
+      } else {
+        const resume = confirm('It looks like there is an unfinished session under this ID.\n\nWould you like to continue where you left off?\n\n• OK — Resume the previous session\n• Cancel — Go back and enter a different ID');
+        if (!resume) {
+          const errEl = document.getElementById('login-error');
+          errEl.textContent = 'Please enter a different Participant ID.';
+          errEl.style.display = 'block';
+          return;
+        }
+        state.nickname      = existing.nickname;
+        state.participantId = existing.id;
+        state.sampleOrder   = existing.sample_order;
+        state.currentIndex  = existing.last_sample_index;
+      }
+    } else {
+      const order = shuffle(AUDIO_FILES);
+      const { data: created, error } = await db
+        .from('participants')
+        .insert({ nickname, sample_order: order, last_sample_index: 0, completed: false })
+        .select().single();
+      if (error) throw error;
+      state.nickname = nickname; state.participantId = created.id;
+      state.sampleOrder = order; state.currentIndex = 0;
+    }
+
+    document.getElementById('total-count').textContent = AUDIO_FILES.length;
+    showScreen('instructions');
+  } catch (err) {
+    console.error(err);
+    document.getElementById('login-error').textContent = 'Connection error. Check Supabase config.';
+    document.getElementById('login-error').style.display = 'block';
+  } finally {
+    btn.classList.remove('loading'); btn.disabled = false;
+  }
+}
+
+document.getElementById('nickname-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin();
+});
+
+function startTask() {
+  document.getElementById('progress-bar-wrap').style.display = 'block';
+  renderQuestions();
+  loadSample(state.currentIndex);
+  showScreen('task');
+}
+
+/* ── RENDER QUESTIONS ── */
+function renderQuestions() {
+  const container = document.getElementById('questions-container');
+  container.innerHTML = '';
+
+  QUESTIONS.forEach((q, i) => {
+    const block = document.createElement('div');
+    block.className = 'question-block';
+    block.dataset.qid = q.id;
+
+    const idx  = `<div class="question-index">Question ${i+1} of ${QUESTIONS.length}</div>`;
+    const text = `<div class="question-text">${q.text}</div>`;
+    let input  = '';
+
+    if (q.type === 'likert') {
+      const radios = Array.from({ length: q.scale }, (_, k) => {
+        const val = k + 1;
+        return `<div class="likert-option">
+          <input type="radio" name="${q.id}" id="${q.id}_${val}" value="${val}" onchange="onResponseChange()"/>
+          <label for="${q.id}_${val}">${val}</label>
+        </div>`;
+      }).join('');
+      input = `<div class="likert-row">${radios}</div>
+               <div class="likert-anchors"><span>${q.anchorLow}</span><span>${q.anchorHigh}</span></div>`;
+    } else if (q.type === 'map') {
+      input = `<div class="map-outer" id="${q.id}_container">
+                 <svg id="${q.id}_svg" style="display:block;width:100%;height:auto;"></svg>
+               </div>
+               <div class="map-footer">
+                 <span class="map-state-name" id="${q.id}_statename">—</span>
+                 <span class="map-hint" id="${q.id}_hint">Click on a US state to place a pin</span>
+                 <button class="map-reset" id="${q.id}_reset" onclick="resetMap('${q.id}')">Remove pin</button>
+               </div>`;
+    }
+
+    block.innerHTML = idx + text + input;
+    container.appendChild(block);
+  });
+
+  if (QUESTIONS.some(q => q.type === 'map')) {
+    document.querySelector('#screen-task .card').classList.add('has-map');
+  }
+  requestAnimationFrame(() => initMaps());
+}
+
+function onResponseChange() {
+  const allAnswered = QUESTIONS.every(q => {
+    if (q.type === 'likert') return document.querySelector(`input[name="${q.id}"]:checked`) !== null;
+    if (q.type === 'map') return !q.required || !!(mapPins[q.id] && mapPins[q.id].placed);
+    return true;
+  });
+  document.getElementById('next-btn').disabled = !allAnswered;
+}
+
+/* ── AUDIO ── */
+const audioEl   = document.getElementById('audio-el');
+const playIcon  = document.getElementById('play-icon');
+const pauseIcon = document.getElementById('pause-icon');
+const progress  = document.getElementById('audio-progress');
+
+function loadSample(index) {
+  const filename = state.sampleOrder[index];
+  audioEl.src = AUDIO_BASE_URL + encodeURIComponent(filename);
+  audioEl.load();
+  progress.value = 0;
+  document.getElementById('time-current').textContent = '0:00';
+  document.getElementById('time-total').textContent   = '0:00';
+  setPlayIcon(false);
+  const total = state.sampleOrder.length;
+  document.getElementById('sample-counter').textContent = `Sample ${index + 1} of ${total}`;
+  document.getElementById('footer-current').textContent = index + 1;
+  document.getElementById('footer-total').textContent   = total;
+  document.getElementById('next-btn-text').textContent  = index === total - 1 ? 'Finish ✓' : 'Next →';
+  document.getElementById('progress-bar-fill').style.width = (index / total * 100) + '%';
+  resetResponses();
+}
+
+function resetResponses() {
+  document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+  QUESTIONS.filter(q => q.type === 'map').forEach(q => resetMap(q.id));
+  document.getElementById('next-btn').disabled = true;
+}
+
+function togglePlay() { audioEl.paused ? audioEl.play() : audioEl.pause(); }
+function setPlayIcon(p) { playIcon.style.display = p ? 'none' : 'block'; pauseIcon.style.display = p ? 'block' : 'none'; }
+
+audioEl.addEventListener('play',  () => setPlayIcon(true));
+audioEl.addEventListener('pause', () => setPlayIcon(false));
+audioEl.addEventListener('ended', () => setPlayIcon(false));
+audioEl.addEventListener('timeupdate', () => {
+  if (!isNaN(audioEl.duration) && audioEl.duration > 0) {
+    progress.value = (audioEl.currentTime / audioEl.duration) * 100;
+    document.getElementById('time-current').textContent = formatTime(audioEl.currentTime);
+  }
+});
+audioEl.addEventListener('loadedmetadata', () => {
+  document.getElementById('time-total').textContent = formatTime(audioEl.duration);
+  progress.max = 100;
+});
+progress.addEventListener('input', () => {
+  if (!isNaN(audioEl.duration)) audioEl.currentTime = (progress.value / 100) * audioEl.duration;
+});
+function formatTime(sec) {
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+/* ── COLLECT & SUBMIT ── */
+function collectResponses() {
+  const result = {};
+  QUESTIONS.forEach(q => {
+    if (q.type === 'likert') {
+      const sel = document.querySelector(`input[name="${q.id}"]:checked`);
+      result[q.id] = sel ? parseInt(sel.value) : null;
+    } else if (q.type === 'map') {
+      const pin = mapPins[q.id];
+      result[q.id + '_state'] = pin && pin.placed ? pin.state  : null;
+      result[q.id + '_x_pct'] = pin && pin.placed ? pin.x_pct : null;
+      result[q.id + '_y_pct'] = pin && pin.placed ? pin.y_pct : null;
+    }
+  });
+  return result;
+}
+
+async function submitResponse() {
+  const btn = document.getElementById('next-btn');
+  btn.disabled = true;
+
+  const responses  = collectResponses();
+  const filename   = state.sampleOrder[state.currentIndex];
+  const nextIndex  = state.currentIndex + 1;
+  const isComplete = nextIndex >= state.sampleOrder.length;
+
+  try {
+    await db.from('responses').insert({
+      participant_id: state.participantId,
+      nickname:       state.nickname,
+      sample_filename: filename,
+      sample_index:   state.currentIndex,
+      responded_at:   new Date().toISOString(),
+      ...responses
+    });
+    await db.from('participants')
+      .update({ last_sample_index: nextIndex, completed: isComplete })
+      .eq('id', state.participantId);
+
+    if (isComplete) {
+      document.getElementById('progress-bar-fill').style.width = '100%';
+      document.getElementById('complete-count').textContent = state.sampleOrder.length;
+      showScreen('info');
+    } else {
+      state.currentIndex = nextIndex;
+      loadSample(state.currentIndex);
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Error saving response. Please check your connection and try again.');
+    btn.disabled = false;
+  }
+}
+
+/* ── PARTICIPANT INFO ── */
+async function submitInfo() {
+  const name     = document.getElementById('info-name').value.trim();
+  const email    = document.getElementById('info-email').value.trim();
+  const age      = document.getElementById('info-age').value.trim();
+  const language = document.getElementById('info-language').value.trim();
+  const country  = document.getElementById('info-country').value.trim();
+  const english  = document.getElementById('info-english').value;
+
+  if (!name || !email || !age || !language || !country || !english) {
+    document.getElementById('info-error').style.display = 'block';
+    return;
+  }
+  document.getElementById('info-error').style.display = 'none';
+
+  try {
+    await db.from('participant_info').insert({
+      participant_id: state.participantId,
+      nickname:       state.nickname,
+      full_name:      name,
+      email,
+      age:            parseInt(age) || null,
+      native_language: language,
+      country_of_origin: country,
+      english_proficiency: english,
+      comments:       document.getElementById('info-comments').value.trim(),
+      submitted_at:   new Date().toISOString()
+    });
+    showScreen('production');
+  } catch (err) {
+    console.error(err);
+    alert('Error saving information. Please try again.');
+  }
+}
+
+function goToProduction() {
+  window.location.href = 'production.html';
+}
+
+/* ── MAP ── */
+let topoCache = null;
+const mapPins = {};
+
+async function loadTopo() {
+  if (topoCache) return topoCache;
+  const res = await fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json');
+  topoCache = await res.json();
+  return topoCache;
+}
+
+async function initMaps() {
+  const mapQs = QUESTIONS.filter(q => q.type === 'map');
+  if (!mapQs.length) return;
+  const topo = await loadTopo();
+  mapQs.forEach(q => {
+    mapPins[q.id] = { placed: false, state: null, x_pct: null, y_pct: null };
+    drawMap(q.id, topo);
+  });
+}
+
+function drawMap(qid, topo) {
+  const svgEl = document.getElementById(qid + '_svg');
+  if (!svgEl) return;
+  const W = 960, H = 600;
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const svg        = d3.select(svgEl);
+  const states     = topojson.feature(topo, topo.objects.states);
+  const borders    = topojson.mesh(topo, topo.objects.states, (a, b) => a !== b);
+  const nation     = topojson.mesh(topo, topo.objects.states, (a, b) => a === b);
+  const projection = d3.geoAlbersUsa().scale(1280).translate([W / 2, H / 2]);
+  const path       = d3.geoPath().projection(projection);
+
+  const stateNameById = {};
+  topo.objects.states.geometries.forEach(g => {
+    stateNameById[g.id] = g.properties && g.properties.name ? g.properties.name : g.id;
+  });
+
+  // Build region lookup
+  const stateToRegion = {};
+  const regionColors  = {};
+  Object.entries(REGIONS).forEach(([region, cfg]) => {
+    regionColors[region] = cfg.color;
+    cfg.states.forEach(s => { stateToRegion[s] = region; });
+  });
+
+  // Draw states with region color as base
+  svg.append('g').selectAll('path')
+    .data(states.features)
+    .join('path')
+    .attr('class', 'state-path')
+    .attr('d', path)
+    .attr('data-name', d => stateNameById[d.id] || '')
+    .style('fill', d => {
+      const name = stateNameById[d.id];
+      const region = stateToRegion[name];
+      return region ? regionColors[region] : '#c8dce8';
+    })
+    .on('click', function(event, d) {
+      const [mx, my] = d3.pointer(event, svgEl);
+      placeMapPin(qid, mx, my, stateNameById[d.id] || '', W, H);
+    });
+
+  svg.append('path').datum(borders).attr('class', 'state-border').attr('d', path);
+  svg.append('path').datum(nation).attr('class', 'nation-border').attr('d', path);
+
+  // Region labels
+  Object.entries(REGIONS).forEach(([region, cfg]) => {
+    svg.append('text')
+      .attr('class', 'region-label')
+      .attr('x', cfg.labelX)
+      .attr('y', cfg.labelY)
+      .attr('text-anchor', 'middle')
+      .text(region);
+  });
+
+  // NYC oval + label
+  svg.append('ellipse')
+    .attr('cx', 822).attr('cy', 192)
+    .attr('rx', 18).attr('ry', 11)
+    .attr('fill', 'none')
+    .attr('stroke', '#444').attr('stroke-width', 2)
+    .attr('pointer-events', 'none');
+  svg.append('text')
+    .attr('class', 'region-label')
+    .attr('x', 848).attr('y', 188)
+    .attr('text-anchor', 'start')
+    .style('font-size', '14px')
+    .text('NYC');
+
+  // Ocean area click
+  svgEl.addEventListener('click', function(e) {
+    if (e.target === svgEl || e.target.tagName === 'svg') {
+      placeMapPin(qid, 0, 0, null, W, H);
+    }
+  });
+
+  setupPinDrag(qid, svgEl, W, H, stateNameById, path, states);
+}
+
+function placeMapPin(qid, svgX, svgY, stateName, W, H) {
+  if (!stateName) {
+    const hintEl = document.getElementById(qid + '_hint');
+    hintEl.textContent = '\u26a0 Please click on a US state.';
+    hintEl.style.color = 'var(--warn)';
+    setTimeout(() => {
+      hintEl.style.color = '';
+      hintEl.textContent = mapPins[qid] && mapPins[qid].placed ? 'Drag to adjust' : 'Click on a US state to place a pin';
+    }, 2000);
+    return;
+  }
+
+  const svgEl = document.getElementById(qid + '_svg');
+  const svg   = d3.select(svgEl);
+
+  svg.select('.map-pin').remove();
+  svg.selectAll('.state-path').classed('active', false);
+
+  const g = svg.append('g').attr('class', 'map-pin').attr('transform', `translate(${svgX},${svgY})`);
+  g.append('path').attr('d', 'M0,-22 C-8,-22 -14,-16 -14,-8 C-14,4 0,22 0,22 C0,22 14,4 14,-8 C14,-16 8,-22 0,-22 Z').attr('fill', '#E24B4A');
+  g.append('circle').attr('r', 5).attr('fill', 'white').attr('cy', -8);
+
+  svg.selectAll('.state-path').filter(function() {
+    return d3.select(this).attr('data-name') === stateName;
+  }).classed('active', true);
+
+  mapPins[qid] = {
+    placed: true, state: stateName,
+    x_pct: Math.round((svgX / W) * 1000) / 10,
+    y_pct: Math.round((svgY / H) * 1000) / 10
+  };
+
+  document.getElementById(qid + '_statename').textContent = stateName;
+  document.getElementById(qid + '_hint').textContent      = 'Drag to adjust';
+  document.getElementById(qid + '_hint').style.color      = '';
+  document.getElementById(qid + '_reset').style.display   = 'inline';
+  onResponseChange();
+}
+
+function setupPinDrag(qid, svgEl, W, H, stateNameById, path, states) {
+  function svgCoords(e) {
+    const rect = svgEl.getBoundingClientRect();
+    const scaleX = W / rect.width, scaleY = H / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return [
+      Math.max(0, Math.min(W, (clientX - rect.left) * scaleX)),
+      Math.max(0, Math.min(H, (clientY - rect.top)  * scaleY))
+    ];
+  }
+
+  function updatePin(x, y) {
+    d3.select(svgEl).select('.map-pin').attr('transform', `translate(${x},${y})`);
+    const sn = getStateAtPoint(svgEl, x, y, W, H);
+    d3.select(svgEl).selectAll('.state-path').classed('active', false);
+    if (sn) d3.select(svgEl).selectAll('.state-path').filter(function() { return d3.select(this).attr('data-name') === sn; }).classed('active', true);
+    document.getElementById(qid + '_statename').textContent = sn || '—';
+    mapPins[qid] = { placed: true, state: sn || '(outside)', x_pct: Math.round(x/W*1000)/10, y_pct: Math.round(y/H*1000)/10 };
+  }
+
+  svgEl.addEventListener('mousedown', e => {
+    if (!e.target.closest('.map-pin')) return;
+    e.preventDefault();
+    const onMove = ev => { const [x,y] = svgCoords(ev); updatePin(x,y); };
+    const onUp   = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  svgEl.addEventListener('touchstart', e => {
+    if (!e.target.closest('.map-pin')) return;
+    e.preventDefault();
+    const onMove = ev => { ev.preventDefault(); const [x,y] = svgCoords(ev); updatePin(x,y); };
+    const onEnd  = () => { svgEl.removeEventListener('touchmove', onMove); svgEl.removeEventListener('touchend', onEnd); };
+    svgEl.addEventListener('touchmove', onMove, { passive: false });
+    svgEl.addEventListener('touchend', onEnd);
+  }, { passive: false });
+}
+
+function getStateAtPoint(svgEl, svgX, svgY, W, H) {
+  const rect = svgEl.getBoundingClientRect();
+  const el = document.elementFromPoint(
+    rect.left + (svgX / W) * rect.width,
+    rect.top  + (svgY / H) * rect.height
+  );
+  if (el && el.classList.contains('state-path')) return el.getAttribute('data-name') || null;
+  return null;
+}
+
+function resetMap(qid) {
+  const svgEl = document.getElementById(qid + '_svg');
+  if (!svgEl) return;
+  d3.select(svgEl).select('.map-pin').remove();
+  d3.select(svgEl).selectAll('.state-path').classed('active', false);
+  mapPins[qid] = { placed: false, state: null, x_pct: null, y_pct: null };
+  document.getElementById(qid + '_statename').textContent = '—';
+  document.getElementById(qid + '_hint').textContent      = 'Click on a US state to place a pin';
+  document.getElementById(qid + '_hint').style.color      = '';
+  document.getElementById(qid + '_reset').style.display   = 'none';
+  onResponseChange();
+}
+</script>
+</body>
+</html>
