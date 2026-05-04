@@ -516,12 +516,16 @@ const REGIONS = {
     color: '#f0b8b8', labelX: 590, labelY: 410
   },
   'Mid-Atlantic': {
-    states: ['New York','New Jersey','Pennsylvania','Delaware','Maryland','Virginia'],
-    color: '#c0c0c8', labelX: 790, labelY: 200
+    states: ['New Jersey','Pennsylvania','Delaware','Maryland','Virginia'],
+    color: '#c0c0c8', labelX: 800, labelY: 225
   },
-  'N.E.': {
+  'New England': {
     states: ['Maine','New Hampshire','Vermont','Massachusetts','Rhode Island','Connecticut'],
-    color: '#c0a8d8', labelX: 848, labelY: 108
+    color: '#c0a8d8', labelX: 878, labelY: 108
+  },
+  'NYC': {
+    states: ['New York'],
+    color: '#a088c8', labelX: 818, labelY: 162
   }
 };
 
@@ -893,19 +897,7 @@ function drawMap(qid, topo) {
       .text(region);
   });
 
-  // NYC oval + label
-  svg.append('ellipse')
-    .attr('cx', 822).attr('cy', 192)
-    .attr('rx', 18).attr('ry', 11)
-    .attr('fill', 'none')
-    .attr('stroke', '#444').attr('stroke-width', 2)
-    .attr('pointer-events', 'none');
-  svg.append('text')
-    .attr('class', 'region-label')
-    .attr('x', 848).attr('y', 188)
-    .attr('text-anchor', 'start')
-    .style('font-size', '14px')
-    .text('NYC');
+  // NYC label rendered via REGIONS loop above
 
   // Ocean area click
   svgEl.addEventListener('click', function(e) {
