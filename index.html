@@ -854,7 +854,7 @@ async function submitInfo() {
 }
 
 function goToProduction() {
-  window.location.href = 'production.html';
+  window.location.href = `production.html?nickname=${encodeURIComponent(state.nickname)}&pid=${state.participantId}`;
 }
 
 /* ── MAP ── */
