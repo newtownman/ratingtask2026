@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Speech Production Study</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.2/RecordRTC.min.js"></script>
+
+<style>
+:root {
+  --bg:        #f4f1ec;
+  --surface:   #ffffff;
+  --border:    #e2ddd6;
+  --text:      #1e1c18;
+  --muted:     #7a756c;
+  --accent:    #2d5f4e;
+  --accent-lt: #e8f0ec;
+  --warn:      #c0392b;
+  --green:     #27ae60;
+  --yellow:    #f39c12;
+  --radius:    12px;
+  --shadow:    0 2px 16px rgba(0,0,0,0.07);
+  --font-head: 'Fraunces', Georgia, serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-body); min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 2rem 1rem;
+}
+.card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); border: 1px solid var(--border);
+  padding: 2.5rem 2.8rem; width: 100%; max-width: 640px;
+}
+.study-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.8rem; }
+h1 { font-family: var(--font-head); font-size: 2rem; font-weight: 600; line-height: 1.25; margin-bottom: 0.5rem; }
+h2 { font-family: var(--font-head); font-size: 1.35rem; font-weight: 600; margin-bottom: 1rem; }
+p { line-height: 1.65; color: var(--muted); font-size: 0.93rem; }
+.subtitle { color: var(--muted); font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.8rem; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.75rem 1.6rem; border-radius: 8px;
+  font-family: var(--font-body); font-size: 0.95rem; font-weight: 600;
+  cursor: pointer; border: none; transition: all 0.15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #245041; transform: translateY(-1px); }
+.btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+.btn-block { width: 100%; justify-content: center; margin-top: 1.2rem; }
+.btn-outline { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+.btn-outline:hover { background: var(--accent-lt); }
+.error-msg { color: var(--warn); font-size: 0.83rem; margin-top: 0.5rem; display: none; }
+.instr-list { list-style: none; display: flex; flex-direction: column; gap: 0.9rem; margin: 1.2rem 0 1.8rem; }
+.instr-list li { display: flex; gap: 0.8rem; align-items: flex-start; font-size: 0.93rem; color: var(--text); }
+.instr-num { background: var(--accent); color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+/* ── LEVEL METER ── */
+.meter-wrap {
+  background: var(--bg); border-radius: 10px;
+  padding: 1rem 1.2rem; margin-bottom: 1.2rem;
+  border: 1px solid var(--border);
+}
+.meter-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: center; }
+.meter-status { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 99px; }
+.meter-status.good  { background: #d4f5e2; color: #1a7a42; }
+.meter-status.low   { background: #fef3cd; color: #8a6200; }
+.meter-status.clip  { background: #fdd; color: var(--warn); }
+.meter-bars { display: flex; gap: 3px; height: 28px; align-items: flex-end; }
+.meter-bar {
+  flex: 1; border-radius: 2px 2px 0 0;
+  background: var(--border); transition: height 0.05s, background 0.1s;
+  min-height: 3px;
+}
+.meter-bar.active-low   { background: var(--yellow); }
+.meter-bar.active-ok    { background: var(--green); }
+.meter-bar.active-clip  { background: var(--warn); }
+
+/* ── MIC TEST ── */
+.mic-test-area {
+  display: flex; flex-direction: column; gap: 0.8rem;
+  margin-bottom: 1.2rem;
+}
+.test-controls { display: flex; gap: 0.8rem; }
+.test-controls .btn { flex: 1; justify-content: center; }
+.test-playback { display: none; align-items: center; gap: 0.8rem; font-size: 0.85rem; color: var(--muted); }
+.test-playback audio { flex: 1; height: 32px; }
+
+/* ── RECORDING SCREEN ── */
+#progress-bar-wrap { position: fixed; top: 0; left: 0; right: 0; height: 4px; background: var(--border); z-index: 100; }
+#progress-bar-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; border-radius: 0 2px 2px 0; }
+
+.context-box {
+  background: var(--accent-lt); border-radius: 10px;
+  padding: 1rem 1.4rem; margin-bottom: 1.4rem;
+  border-left: 3px solid var(--accent);
+}
+.context-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.3rem; }
+.context-text { font-size: 0.95rem; color: var(--text); font-style: italic; }
+
+.sentence-box {
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: 12px; padding: 1.4rem 1.8rem;
+  text-align: center; margin-bottom: 1.4rem;
+  font-family: var(--font-head); font-size: 1.5rem; font-weight: 300;
+  color: var(--text); line-height: 1.5;
+  transition: border-color 0.2s;
+}
+.sentence-box.recording { border-color: var(--warn); background: #fff8f8; }
+.sentence-box .target {
+  font-weight: 600; color: var(--accent);
+  text-decoration: underline; text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+.record-btn-wrap { display: flex; justify-content: center; margin-bottom: 1.2rem; }
+.record-btn {
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 3px solid var(--accent); background: var(--surface);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; position: relative;
+}
+.record-btn:hover { background: var(--accent-lt); transform: scale(1.05); }
+.record-btn.recording { border-color: var(--warn); background: #fff0f0; animation: pulse 1.2s infinite; }
+.record-btn.done { border-color: var(--green); background: #f0faf4; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.3); }
+  50% { box-shadow: 0 0 0 10px rgba(192,57,43,0); }
+}
+.record-icon { width: 24px; height: 24px; border-radius: 50%; background: var(--warn); transition: all 0.2s; }
+.record-btn.recording .record-icon { border-radius: 4px; background: var(--warn); }
+.record-btn.done .record-icon { background: var(--green); border-radius: 50%; }
+.record-hint { text-align: center; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem; }
+
+.task-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 0.8rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.progress-label { font-size: 0.82rem; color: var(--muted); }
+.progress-label strong { color: var(--text); }
+
+/* ── TRANSITION SCREEN ── */
+.transition-box {
+  background: var(--accent); color: #fff; border-radius: 12px;
+  padding: 1.8rem 2rem; text-align: center; margin: 1.2rem 0;
+}
+.transition-box h3 { font-family: var(--font-head); font-size: 1.2rem; margin-bottom: 0.5rem; }
+.transition-box p { color: rgba(255,255,255,0.85); font-size: 0.9rem; }
+
+/* ── COMPLETE ── */
+.complete-icon { width: 60px; height: 60px; background: var(--accent-lt); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+.complete-icon svg { stroke: var(--accent); }
+.center { text-align: center; }
+
+.screen { display: none; animation: fadeIn 0.3s ease; }
+.screen.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* DEV PANEL */
+#dev-panel { position: fixed; bottom: 1rem; right: 1rem; z-index: 9999; background: rgba(0,0,0,0.78); border-radius: 10px; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.4rem; }
+#dev-panel span { font-size: 0.65rem; color: #aaa; text-align: center; }
+#dev-panel button { background: #333; color: #eee; border: 1px solid #555; border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.72rem; cursor: pointer; }
+#dev-panel button:hover { background: #555; }
+</style>
+</head>
+<body>
+
+<div id="progress-bar-wrap"><div id="progress-bar-fill" style="width:0%"></div></div>
+
+<!-- SCREEN 1 · WELCOME + MIC CHECK -->
+<div id="screen-welcome" class="screen active">
+  <div class="card">
+    <div class="study-label">Speech Production Study</div>
+    <h1>Let's check your<br/><em>microphone</em> first.</h1>
+    <p class="subtitle">Before we begin, make sure your microphone is working properly. Please find a quiet environment and use a headset or a good-quality microphone if possible.</p>
+    <hr class="divider"/>
+
+    <div class="meter-wrap">
+      <div class="meter-label">
+        <span>Input Level</span>
+        <span class="meter-status low" id="meter-status">No signal</span>
+      </div>
+      <div class="meter-bars" id="meter-bars"></div>
+    </div>
+
+    <div class="mic-test-area">
+      <div class="test-controls">
+        <button class="btn btn-outline" id="test-record-btn" onclick="startTestRecording()">⏺ Record test</button>
+        <button class="btn btn-outline" id="test-stop-btn" onclick="stopTestRecording()" disabled>⏹ Stop</button>
+      </div>
+      <div class="test-playback" id="test-playback">
+        <span>Play back your recording:</span>
+        <audio id="test-audio" controls></audio>
+      </div>
+    </div>
+
+    <div class="error-msg" id="mic-error">Microphone access denied. Please allow microphone access and refresh.</div>
+    <button class="btn btn-primary btn-block" id="welcome-next-btn" onclick="showScreen('instructions-q1')" disabled>
+      Microphone looks good — Continue →
+    </button>
+  </div>
+</div>
+
+<!-- SCREEN 2 · INSTRUCTIONS Q1 -->
+<div id="screen-instructions-q1" class="screen">
+  <div class="card">
+    <div class="study-label">Block 1 of 2</div>
+    <h2>Instructions</h2>
+    <ul class="instr-list">
+      <li><span class="instr-num">1</span>You will see a sentence on screen. Read it aloud clearly and naturally.</li>
+      <li><span class="instr-num">2</span>The <strong style="color:var(--accent)">highlighted word</strong> is the key word — make sure it is clear.</li>
+      <li><span class="instr-num">3</span>Press the record button, read the sentence, then press stop.</li>
+      <li><span class="instr-num">4</span>You can re-record if you make a mistake — only the last recording is saved.</li>
+      <li><span class="instr-num">5</span>There are 91 sentences in this block.</li>
+    </ul>
+    <div class="transition-box">
+      <h3>Context for this block</h3>
+      <p>Read each sentence aloud. The word in <strong>single quotes ' '</strong> is where you should place emphasis.</p>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="startBlock('q1')">Start Block 1 →</button>
+  </div>
+</div>
+
+<!-- SCREEN 3 · RECORDING (Q1 + Q2) -->
+<div id="screen-recording" class="screen">
+  <div class="card">
+
+    <div class="meter-wrap" style="margin-bottom:1rem;">
+      <div class="meter-label">
+        <span>Mic Level</span>
+        <span class="meter-status low" id="rec-meter-status">—</span>
+      </div>
+      <div class="meter-bars" id="rec-meter-bars"></div>
+    </div>
+
+    <div class="context-box">
+      <div class="context-label" id="rec-context-label">Context</div>
+      <div class="context-text" id="rec-context-text"></div>
+    </div>
+
+    <div class="sentence-box" id="sentence-box"></div>
+
+    <div class="record-btn-wrap">
+      <button class="record-btn" id="record-btn" onclick="toggleRecording()">
+        <div class="record-icon"></div>
+      </button>
+    </div>
+    <div class="record-hint" id="record-hint">Press to start recording</div>
+
+    <div class="task-footer">
+      <div class="progress-label">
+        <strong id="rec-current">1</strong> / <span id="rec-total">92</span>
+      </div>
+      <button class="btn btn-primary" id="rec-next-btn" onclick="nextItem()" disabled>Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 4 · TRANSITION Q1 → Q2 -->
+<div id="screen-transition" class="screen">
+  <div class="card center" style="text-align:center;">
+    <div class="study-label">Block 1 complete</div>
+    <h2>Great work!</h2>
+    <p style="margin-bottom:1.5rem;">You have completed the first block. Take a short break if needed.</p>
+    <div class="transition-box">
+      <h3>Block 2 — Different context</h3>
+      <p>The sentence is the same, but now <strong>'nothing'</strong> gets the emphasis — not the target word.</p>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="startBlock('q2')" style="margin-top:1.2rem;">Start Block 2 →</button>
+  </div>
+</div>
+
+<!-- SCREEN 5 · COMPLETE -->
+<div id="screen-complete" class="screen">
+  <div class="card center">
+    <div class="complete-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>All done — thank you!</h2>
+    <p style="margin-bottom:1rem;">All recordings have been saved. You may now close this tab.</p>
+    <p id="upload-status" style="font-size:0.82rem; color:var(--muted);"></p>
+  </div>
+</div>
+
+<!-- DEV PANEL -->
+<div id="dev-panel">
+  <span>DEV NAV</span>
+  <button onclick="showScreen('welcome')">1. Welcome</button>
+  <button onclick="showScreen('instructions-q1')">2. Q1 Instr</button>
+  <button onclick="devStartRecording('q1')">3. Recording Q1</button>
+  <button onclick="showScreen('transition')">4. Transition</button>
+  <button onclick="devStartRecording('q2')">5. Recording Q2</button>
+  <button onclick="showScreen('complete')">6. Complete</button>
+</div>
+
+<script>
+/* ── CONFIG ── */
+const SUPABASE_URL  = 'https://snwwuzrdpslhbisdubmf.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3d1enJkcHNsaGJpc2R1Ym1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NjAzMTgsImV4cCI6MjA5MzAzNjMxOH0.rWfdYWZ1F7OHp8peyPR9LJXqJIiWHLE6eRZKXgnWQ8Y';
+const STORAGE_BUCKET = 'production-audio';
+
+/* ── WORD LIST (92 words) ── */
+const WORDS = [
+  'when','win','men','min','ten','tin','ben','bin','pen','pin',
+  'jen','jin','ken','kin','get','git','dead','did','let','lit',
+  'set','sit','bet','bit','head','hid','red','rid','thing','bring',
+  'king','sing','ring','jim','skin','said','guess','check','death','met',
+  'bed','step','give','big','shit','miss','kid','hit','wish','den',
+  'gen','wen','hen','clem','zen','gem','guy','try','die',
+  'high','bye','lie','fly','fire','child','file','wire','hire','mile',
+  'pile','time','fine','line','sign','nine','wine','shine','guys','five',
+  'side','tried','died','drive','ride','right','night','life','nice','wife',
+  'fight','white'
+];
+
+/* ── SENTENCES ── */
+function getSentence(block, word) {
+  if (block === 'q1') {
+    // focused: emphasis on target word
+    return {
+      html: `I don't know nothing about, <span class="target">&#8216;${word}&#8217;</span> for real.`
+    };
+  } else {
+    // unfocused: emphasis on 'nothing', word is given
+    return {
+      html: `I don't know <span class="target">&#8216;nothing&#8217;</span> about ${word}, for real.`
+    };
+  }
+}
+
+function getContext(block) {
+  if (block === 'q1') return {
+    label: 'Block 1 — Focus on target word',
+    text: 'Emphasize the word in single quotes when reading.'
+  };
+  return {
+    label: 'Block 2 — Focus on \'nothing\'',
+    text: 'Emphasize the word \'nothing\' when reading.'
+  };
+}
+
+/* ── SUPABASE ── */
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+/* ── PARTICIPANT ── */
+const params   = new URLSearchParams(window.location.search);
+const nickname = params.get('nickname') || localStorage.getItem('prod_nickname') || 'unknown';
+const pid      = params.get('pid')      || localStorage.getItem('prod_pid')      || null;
+if (nickname !== 'unknown') localStorage.setItem('prod_nickname', nickname);
+if (pid)                    localStorage.setItem('prod_pid', pid);
+
+/* ── STATE ── */
+let currentBlock     = 'q1';
+let currentIndex     = 0;
+let rtcRecorder      = null;
+let lastBlob         = null;
+let recordingActive  = false;
+let micStream        = null;
+let audioCtx         = null;
+let analyser         = null;
+let meterRAF         = null;
+const NUM_BARS       = 24;
+
+/* ── SCREEN ── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+/* ── BUILD METER BARS ── */
+function buildBars(containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  for (let i = 0; i < NUM_BARS; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'meter-bar';
+    container.appendChild(bar);
+  }
+}
+buildBars('meter-bars');
+buildBars('rec-meter-bars');
+
+/* ── MIC INIT ── */
+async function initMic() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    audioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+    analyser  = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    audioCtx.createMediaStreamSource(micStream).connect(analyser);
+    startMeter('meter-bars', 'meter-status');
+    document.getElementById('welcome-next-btn').disabled = false;
+    document.getElementById('mic-error').style.display = 'none';
+  } catch (err) {
+    document.getElementById('mic-error').style.display = 'block';
+    console.error('Mic error:', err);
+  }
+}
+
+/* ── LEVEL METER ── */
+function startMeter(barsId, statusId) {
+  const bars      = document.getElementById(barsId).querySelectorAll('.meter-bar');
+  const statusEl  = document.getElementById(statusId);
+  const dataArr   = new Uint8Array(analyser.frequencyBinCount);
+
+  function tick() {
+    analyser.getByteTimeDomainData(dataArr);
+    let sum = 0;
+    for (let i = 0; i < dataArr.length; i++) {
+      const v = (dataArr[i] - 128) / 128;
+      sum += v * v;
+    }
+    const rms   = Math.sqrt(sum / dataArr.length);
+    const level = Math.min(1, rms * 6);
+    const lit   = Math.round(level * NUM_BARS);
+
+    bars.forEach((bar, i) => {
+      const pct = (i + 1) / NUM_BARS;
+      if (i < lit) {
+        bar.style.height = (30 + Math.random() * 40) + '%';
+        bar.className = 'meter-bar ' + (pct > 0.85 ? 'active-clip' : pct > 0.15 ? 'active-ok' : 'active-low');
+      } else {
+        bar.style.height = '8%';
+        bar.className = 'meter-bar';
+      }
+    });
+
+    if (level < 0.05) {
+      statusEl.textContent = 'No signal'; statusEl.className = 'meter-status low';
+    } else if (level < 0.15) {
+      statusEl.textContent = 'Too quiet'; statusEl.className = 'meter-status low';
+    } else if (level > 0.9) {
+      statusEl.textContent = 'Clipping!'; statusEl.className = 'meter-status clip';
+    } else {
+      statusEl.textContent = 'Good'; statusEl.className = 'meter-status good';
+    }
+
+    meterRAF = requestAnimationFrame(tick);
+  }
+  if (meterRAF) cancelAnimationFrame(meterRAF);
+  tick();
+}
+
+/* ── TEST RECORDING ── */
+let testRecorder = null;
+
+function startTestRecording() {
+  if (!micStream) return;
+  testRecorder = new RecordRTC(micStream, {
+    type: 'audio', mimeType: 'audio/wav',
+    recorderType: RecordRTC.StereoAudioRecorder,
+    numberOfAudioChannels: 1, desiredSampRate: 44100,
+  });
+  testRecorder.startRecording();
+  document.getElementById('test-record-btn').disabled = true;
+  document.getElementById('test-stop-btn').disabled   = false;
+}
+
+function stopTestRecording() {
+  if (!testRecorder) return;
+  testRecorder.stopRecording(() => {
+    const blob = testRecorder.getBlob();
+    const url  = URL.createObjectURL(blob);
+    document.getElementById('test-audio').src = url;
+    document.getElementById('test-playback').style.display = 'flex';
+  });
+  document.getElementById('test-record-btn').disabled = false;
+  document.getElementById('test-stop-btn').disabled   = true;
+}
+
+/* ── START BLOCK ── */
+function startBlock(block) {
+  currentBlock = block;
+  currentIndex = 0;
+  renderRecordingItem();
+  startMeter('rec-meter-bars', 'rec-meter-status');
+  showScreen('recording');
+}
+
+/* ── RENDER ITEM ── */
+function renderRecordingItem() {
+  const word     = WORDS[currentIndex];
+  const sentence = getSentence(currentBlock, word);
+  const context  = getContext(currentBlock);
+  const total    = WORDS.length;
+
+  // Context
+  document.getElementById('rec-context-label').textContent = context.label;
+  document.getElementById('rec-context-text').textContent  = context.text;
+
+  // Sentence
+  const box = document.getElementById('sentence-box');
+  box.className = 'sentence-box';
+  box.innerHTML = sentence.html;
+
+  // Progress
+  document.getElementById('rec-current').textContent = currentIndex + 1;
+  document.getElementById('rec-total').textContent   = total;
+  document.getElementById('progress-bar-fill').style.width =
+    ((currentBlock === 'q2' ? total + currentIndex : currentIndex) / (total * 2) * 100) + '%';
+
+  // Reset recording state
+  lastBlob = null;
+  setRecordState('idle');
+  document.getElementById('rec-next-btn').disabled = true;
+}
+
+function setRecordState(state) {
+  const btn  = document.getElementById('record-btn');
+  const hint = document.getElementById('record-hint');
+  const box  = document.getElementById('sentence-box');
+  btn.className  = 'record-btn' + (state === 'recording' ? ' recording' : state === 'done' ? ' done' : '');
+  box.className  = 'sentence-box' + (state === 'recording' ? ' recording' : '');
+  hint.textContent = state === 'idle' ? 'Press to start recording'
+                   : state === 'recording' ? 'Recording… press to stop'
+                   : '✓ Recorded — press Next or re-record';
+}
+
+/* ── RECORD TOGGLE ── */
+function toggleRecording() {
+  if (!micStream) return;
+  if (recordingActive) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+function startRecording() {
+  lastBlob = null;
+  rtcRecorder = new RecordRTC(micStream, {
+    type: 'audio', mimeType: 'audio/wav',
+    recorderType: RecordRTC.StereoAudioRecorder,
+    numberOfAudioChannels: 1, desiredSampRate: 44100,
+  });
+  rtcRecorder.startRecording();
+  recordingActive = true;
+  setRecordState('recording');
+}
+
+function stopRecording() {
+  if (!rtcRecorder || !recordingActive) return;
+  rtcRecorder.stopRecording(() => {
+    lastBlob = rtcRecorder.getBlob();
+    setRecordState('done');
+    document.getElementById('rec-next-btn').disabled = false;
+  });
+  recordingActive = false;
+}
+
+/* ── NEXT ITEM ── */
+async function nextItem() {
+  if (lastBlob) {
+    uploadRecording(currentBlock, currentIndex, WORDS[currentIndex], lastBlob);
+  }
+
+  currentIndex++;
+  if (currentIndex >= WORDS.length) {
+    if (currentBlock === 'q1') {
+      if (recordingActive) stopRecording();
+      showScreen('transition');
+    } else {
+      if (recordingActive) stopRecording();
+      document.getElementById('upload-status').textContent = 'Uploading remaining files…';
+      showScreen('complete');
+    }
+    return;
+  }
+  renderRecordingItem();
+}
+
+/* ── UPLOAD ── */
+async function uploadRecording(block, index, word, blob) {
+  try {
+    const focusLabel = block === 'q1' ? 'focus' : 'unfocus';
+    const path = `${nickname}/${nickname}_${focusLabel}_${word}.wav`;
+    const { data: uploadData, error: uploadError } = await db.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, blob, { contentType: 'audio/wav', upsert: true });
+
+    if (uploadError) { console.error('Upload error:', uploadError); return; }
+
+    const { data: urlData } = db.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+
+    await db.from('production_responses').insert({
+      participant_id: pid,
+      nickname,
+      block,
+      word_index:  index + 1,
+      target_word: word,
+      audio_url:   urlData.publicUrl,
+      recorded_at: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Upload failed for', word, err);
+  }
+}
+
+/* ── DEV HELPERS ── */
+function devStartRecording(block) {
+  if (!micStream) {
+    initMic().then(() => { startBlock(block); });
+  } else {
+    startBlock(block);
+  }
+}
+
+/* ── INIT ── */
+window.addEventListener('load', () => {
+  initMic();
+});
+</script>
+</body>
+</html>
